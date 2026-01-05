@@ -2,48 +2,34 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Battle Robot - Combat</title>
+    <title>Battle Robot - Pro Mobile</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         body { margin: 0; background: #348C31; overflow: hidden; touch-action: none; font-family: sans-serif; }
-        
-        /* UI de Status */
         #ui { position: fixed; top: 10px; right: 20px; color: white; font-weight: bold; z-index: 100; text-align: right; pointer-events: none; }
+        #btn-quit { position: fixed; top: 15px; left: 15px; padding: 10px 20px; background: rgba(0,0,0,0.5); color: white; border: 2px solid #fff; border-radius: 8px; cursor: pointer; z-index: 101; }
         
-        /* Botão de Quitar (Sair) */
-        #btn-quit { 
-            position: fixed; top: 15px; left: 15px; padding: 10px 20px; 
-            background: rgba(0, 0, 0, 0.5); color: white; border: 2px solid #fff; 
-            border-radius: 8px; cursor: pointer; font-weight: bold; z-index: 101;
-            transition: 0.3s; text-decoration: none; font-size: 14px;
-        }
-        #btn-quit:hover { background: #e74c3c; border-color: #e74c3c; }
-
-        /* Controles */
-        #joy-bg { position: fixed; bottom: 50px; left: 50px; width: 100px; height: 100px; background: rgba(255,255,255,0.2); border-radius: 50%; display: none; z-index: 60; border: 2px solid white; }
-        #joy-stick { position: absolute; top: 30px; left: 30px; width: 40px; height: 40px; background: #fff; border-radius: 50%; }
-        #btn-shoot { position: fixed; bottom: 60px; right: 60px; width: 100px; height: 100px; background: rgba(231, 76, 60, 0.8); border: 4px solid white; border-radius: 50%; display: none; z-index: 60; color: white; font-weight: bold; text-align: center; line-height: 90px; user-select: none; }
+        /* Joystick Visual */
+        #joy-bg { position: fixed; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; display: none; z-index: 60; pointer-events: none; }
+        #joy-stick { position: absolute; top: 40px; left: 40px; width: 40px; height: 40px; background: #fff; border-radius: 50%; pointer-events: none; }
         
-        /* Vitória */
+        /* Botão de Tiro Visual */
+        #btn-shoot { position: fixed; bottom: 60px; right: 60px; width: 100px; height: 100px; background: rgba(231, 76, 60, 0.6); border: 4px solid white; border-radius: 50%; display: none; z-index: 60; color: white; font-weight: bold; text-align: center; line-height: 90px; user-select: none; pointer-events: none; }
+        
         #vitoria { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 200; }
-        #vitoria h2 { color: #f1c40f; font-size: 60px; margin-bottom: 20px; text-shadow: 0 0 20px #f1c40f; }
-        .btn-fim { padding: 15px 40px; font-size: 20px; background: #2ecc71; color: white; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .btn-fim { padding: 15px 40px; font-size: 20px; background: #2ecc71; color: white; border: none; border-radius: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <button id="btn-quit" onclick="if(confirm('Sair da partida?')) window.location.href='index.html'">QUIT</button>
-
-    <div id="ui">
-        VIVOS: <span id="count">20</span><br>
-        MIRA: <span id="tg">LIVRE</span>
-    </div>
+    <button id="btn-quit" onclick="if(confirm('Sair?')) window.location.href='index.html'">QUIT</button>
+    <div id="ui">VIVOS: <span id="count">20</span><br>MIRA: <span id="tg">LIVRE</span></div>
     
     <div id="joy-bg"><div id="joy-stick"></div></div>
     <div id="btn-shoot">FIRE</div>
 
     <div id="vitoria">
         <h2>VITÓRIA!</h2>
-        <button class="btn-fim" onclick="window.location.href='index.html'">VOLTAR AO LOBBY</button>
+        <button class="btn-fim" onclick="window.location.href='index.html'">LOBBY</button>
     </div>
 
     <script>
@@ -52,14 +38,14 @@
         const spawnY = parseFloat(urlParams.get('y')) || 2000;
 
         const config = { 
-            type: Phaser.AUTO, 
-            width: window.innerWidth, 
-            height: window.innerHeight, 
+            type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, 
             physics: { default: 'arcade' }, 
+            input: { activePointers: 3 }, // Permite até 3 dedos ao mesmo tempo
             scene: { preload: pre, create: cre, update: upd } 
         };
 
-        let player, bots, tiros, objetos, joyActive = false, moveVec = {x:0, y:0}, gameFim = false;
+        let player, bots, tiros, objetos, gameFim = false;
+        let joyActive = false, moveVec = {x:0, y:0}, joyPointer = null;
         let zonaRaio = 2500, zonaG;
         const game = new Phaser.Game(config);
 
@@ -77,55 +63,61 @@
             const corNum = parseInt(corSalva.replace('#', '0x'), 16);
 
             const g = this.make.graphics();
-            g.fillStyle(corNum); g.fillRect(0,0,40,40); 
-            g.fillStyle(0x333333); g.fillRect(35,12,22,16);
+            g.fillStyle(corNum); g.fillRect(0,0,40,40); g.fillStyle(0x333333); g.fillRect(35,12,22,16);
             g.generateTexture('pTex', 60,40); g.clear();
-            
-            g.fillStyle(0xff0000); g.fillRect(0,0,40,40); 
-            g.fillStyle(0x880000); g.fillRect(35,12,22,16);
+            g.fillStyle(0xff0000); g.fillRect(0,0,40,40); g.fillStyle(0x880000); g.fillRect(35,12,22,16);
             g.generateTexture('bTex', 60,40); g.clear();
-            
-            g.fillStyle(0xffff00); g.fillCircle(5,5,5); 
-            g.generateTexture('bt', 10,10);
+            g.fillStyle(0xffff00); g.fillCircle(5,5,5); g.generateTexture('bt', 10,10);
 
             objetos = this.physics.add.staticGroup();
-            for(let i=0; i<60; i++) {
-                objetos.create(Phaser.Math.Between(100, 3900), Phaser.Math.Between(100, 3900), 'c').setScale(1.2).refreshBody();
-            }
+            for(let i=0; i<60; i++) objetos.create(Phaser.Math.Between(100, 3900), Phaser.Math.Between(100, 3900), 'c').setScale(1.2).refreshBody();
 
             tiros = this.physics.add.group();
             player = this.physics.add.sprite(spawnX, spawnY, 'pTex').setOrigin(0.5).setDrag(1500).setCollideWorldBounds(true);
-            
             bots = this.physics.add.group();
-            for(let i=0; i<19; i++) {
-                bots.create(Phaser.Math.Between(200,3800), Phaser.Math.Between(200,3800), 'bTex').setOrigin(0.5).setDrag(1000).setCollideWorldBounds(true);
-            }
+            for(let i=0; i<19; i++) bots.create(Phaser.Math.Between(200,3800), Phaser.Math.Between(200,3800), 'bTex').setOrigin(0.5).setDrag(1000).setCollideWorldBounds(true);
 
             this.physics.add.collider([player, bots], objetos);
-            this.physics.add.overlap(tiros, bots, (t, b) => { 
-                if(t.owner !== b) { t.destroy(); b.destroy(); document.getElementById('count').innerText = bots.countActive()+1; checkV(); } 
-            });
-            this.physics.add.overlap(tiros, player, (p, t) => { 
-                if(t.owner !== p && !gameFim) location.reload(); 
-            });
+            this.physics.add.overlap(tiros, bots, (t, b) => { if(t.owner !== b) { t.destroy(); b.destroy(); atualizarContagem(); } });
+            this.physics.add.overlap(tiros, player, (p, t) => { if(t.owner !== p && !gameFim) location.reload(); });
             this.physics.add.collider(tiros, objetos, t => t.destroy());
 
             this.cameras.main.startFollow(player, true, 0.1, 0.1);
 
+            // LOGICA MULTI-TOQUE MELHORADA
             if (this.sys.game.device.input.touch) {
                 document.getElementById('joy-bg').style.display='block';
                 document.getElementById('btn-shoot').style.display='block';
-                setupJoy();
-                document.getElementById('btn-shoot').onpointerdown = () => atirar(this, player);
+                
+                this.input.on('pointerdown', (pointer) => {
+                    // Se clicar no lado esquerdo da tela: Joystick
+                    if (pointer.x < window.innerWidth / 2) {
+                        joyActive = true;
+                        joyPointer = pointer;
+                    } 
+                    // Se clicar no lado direito da tela (área do botão): Atirar
+                    else if (pointer.x > window.innerWidth / 2 && pointer.y > window.innerHeight / 2) {
+                        atirar(this, player);
+                    }
+                });
+
+                this.input.on('pointerup', (pointer) => {
+                    if (pointer === joyPointer) {
+                        joyActive = false;
+                        joyPointer = null;
+                        moveVec = {x:0, y:0};
+                        document.getElementById('joy-stick').style.transform = 'translate(0px,0px)';
+                    }
+                });
+            } else {
+                this.input.on('pointerdown', () => atirar(this, player));
             }
-            this.input.on('pointerdown', () => { if(!this.sys.game.device.input.touch) atirar(this, player); });
         }
 
-        function checkV() {
-            if (bots.countActive() === 0 && !gameFim) { 
-                gameFim = true; 
-                document.getElementById('vitoria').style.display = 'flex'; 
-            }
+        function atualizarContagem() {
+            let v = bots.countActive() + 1;
+            document.getElementById('count').innerText = v;
+            if (v === 1 && !gameFim) { gameFim = true; document.getElementById('vitoria').style.display = 'flex'; }
         }
 
         function atirar(s, a) {
@@ -141,41 +133,49 @@
         function upd() {
             if (gameFim) { player.setVelocity(0); return; }
             
+            // Movimento Joystick
+            if (joyActive && joyPointer) {
+                const centerX = 50 + 60; // left + metade da largura
+                const centerY = window.innerHeight - 50 - 60; // bottom + metade
+                let dx = joyPointer.x - centerX;
+                let dy = joyPointer.y - centerY;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                let max = 40;
+                let angle = Math.atan2(dy, dx);
+                let moveDist = Math.min(dist, max);
+                
+                moveVec = { x: Math.cos(angle) * (moveDist/max), y: Math.sin(angle) * (moveDist/max) };
+                document.getElementById('joy-stick').style.transform = `translate(${Math.cos(angle)*moveDist}px, ${Math.sin(angle)*moveDist}px)`;
+            }
+
             let vx = 0, vy = 0;
             let keys = this.input.keyboard.addKeys('W,A,S,D');
-            
             if(keys.A.isDown) vx = -400; else if(keys.D.isDown) vx = 400;
             if(keys.W.isDown) vy = -400; else if(keys.S.isDown) vy = 400;
             if(joyActive) { vx = moveVec.x * 400; vy = moveVec.y * 400; }
             player.setVelocity(vx, vy);
 
-            zonaRaio -= 0.2;
+            // Zona e Mira (Igual antes)
+            zonaRaio -= 0.15;
             zonaG.clear().lineStyle(6, 0x00ffff, 1).strokeCircle(2000, 2000, zonaRaio);
-            
             if (Phaser.Math.Distance.Between(player.x, player.y, 2000, 2000) > zonaRaio) {
-                this.cameras.main.shake(100, 0.005);
                 player.setData('d', (player.getData('d') || 0) + 1);
-                if(player.getData('d') > 150) location.reload();
+                if(player.getData('d') > 200) location.reload();
             }
 
             let alvo = null, minDist = 600;
             bots.children.iterate(b => { 
                 if(b && b.active) {
-                    if (Phaser.Math.Distance.Between(b.x, b.y, 2000, 2000) > zonaRaio) { 
-                        b.destroy(); 
-                        document.getElementById('count').innerText = bots.countActive()+1; 
-                        checkV(); 
-                    }
+                    if (Phaser.Math.Distance.Between(b.x, b.y, 2000, 2000) > zonaRaio) { b.destroy(); atualizarContagem(); }
                     let d = Phaser.Math.Distance.Between(player.x, player.y, b.x, b.y);
                     if(d < minDist) { minDist = d; alvo = b; }
                 }
             });
-
             if (alvo) {
                 player.rotation = Phaser.Math.Angle.Between(player.x, player.y, alvo.x, alvo.y);
                 document.getElementById('tg').innerText = "TRAVADA";
-            } else {
-                if (vx !== 0 || vy !== 0) player.rotation = Math.atan2(vy, vx);
+            } else if (vx !== 0 || vy !== 0) {
+                player.rotation = Math.atan2(vy, vx);
                 document.getElementById('tg').innerText = "LIVRE";
             }
 
@@ -186,20 +186,6 @@
                     atirar(this, b);
                 }
             });
-        }
-
-        function setupJoy() {
-            const bg = document.getElementById('joy-bg'), stick = document.getElementById('joy-stick');
-            window.onpointerdown = e => { if(e.target.id.includes('joy')) joyActive = true; };
-            window.onpointermove = e => {
-                if(!joyActive) return;
-                const rect = bg.getBoundingClientRect(), center = {x: rect.left+50, y: rect.top+50};
-                let dx = e.clientX-center.x, dy = e.clientY-center.y;
-                const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 40), ang = Math.atan2(dy, dx);
-                moveVec = { x: Math.cos(ang)*(dist/40), y: Math.sin(ang)*(dist/40) };
-                stick.style.transform = `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px)`;
-            };
-            window.onpointerup = () => { joyActive = false; stick.style.transform = 'translate(0px,0px)'; moveVec = {x:0,y:0}; };
         }
     </script>
 </body>
