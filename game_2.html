@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Battle Robot - Hard Mode Oficial</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <script src="https://raw.githack.com/rexrainbow/phaser3-rex-notes/master/dist/rexvirtualjoystickplugin.min.js"></script>
+    <style>
+        body { margin: 0; background: #348C31; overflow: hidden; touch-action: none; }
+        #countdown { 
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            color: #fff; font-family: 'Arial Black', sans-serif; font-size: 150px; 
+            text-shadow: 6px 6px 0 #000; z-index: 1000; pointer-events: none; 
+        }
+        /* Botão de Sair Estilizado */
+        #btnLobby {
+            position: fixed; top: 20px; left: 20px;
+            padding: 10px 20px; background: #e74c3c; color: white;
+            font-family: Arial, sans-serif; font-weight: bold;
+            border: 2px solid #c0392b; border-radius: 5px; cursor: pointer; z-index: 2000;
+        }
+    </style>
+</head>
+<body>
+    <button id="btnLobby" onclick="window.location.href='index.html'">SAIR</button>
+    <div id="countdown">3</div>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const config = { 
+            type: Phaser.AUTO, 
+            width: window.innerWidth, height: window.innerHeight, 
+            physics: { default: 'arcade', arcade: { gravity: { y: 0 } } },
+            input: { activePointers: 3 },
+            scene: { preload: pr, create: cr, update: up } 
+        };
+        
+        let player, bots, bullets, obstacles, zoneRadius = 3000, zoneGfx, joystick;
+        let partidaIniciada = false, contagem = 3;
+        let keys, fireButton, isFiring = false, vivoText;
+
+        new Phaser.Game(config);
+
+        function pr() {
+            this.load.plugin('rexvirtualjoystickplugin', 'https://raw.githack.com/rexrainbow/phaser3-rex-notes/master/dist/rexvirtualjoystickplugin.min.js', true);
+        }
+
+        function cr() {
+            this.cameras.main.setBackgroundColor('#348C31');
+            this.physics.world.setBounds(0, 0, 4000, 4000);
+            this.cameras.main.setZoom(1);
+
+            keys = this.input.keyboard.addKeys({
+                up: 'W', down: 'S', left: 'A', right: 'D',
+                upS: 'UP', downS: 'DOWN', leftS: 'LEFT', rightS: 'RIGHT', space: 'SPACE'
+            });
+
+            // Joystick
+            joystick = this.plugins.get('rexvirtualjoystickplugin').add(this, {
+                x: 150, y: window.innerHeight - 150, radius: 80,
+                base: this.add.circle(0, 0, 80, 0x888888, 0.5).setDepth(2000).setScrollFactor(0),
+                thumb: this.add.circle(0, 0, 40, 0xcccccc, 0.8).setDepth(2001).setScrollFactor(0),
+            });
+
+            // Botão Tiro
+            fireButton = this.add.circle(window.innerWidth - 150, window.innerHeight - 150, 75, 0xff0000, 0.7).setInteractive().setDepth(2000).setScrollFactor(0);
+            fireButton.on('pointerdown', () => { isFiring = true; });
+            fireButton.on('pointerup', () => { isFiring = false; });
+            fireButton.on('pointerout', () => { isFiring = false; });
+
+            // Texto de Vivos
+            vivoText = this.add.text(window.innerWidth - 200, 20, 'VIVOS: 31', { 
+                fontSize: '32px', fontFamily: 'Arial Black', fill: '#fff', stroke: '#000', strokeThickness: 6 
+            }).setDepth(2000).setScrollFactor(0);
+
+            const pColor = parseInt((localStorage.getItem('playerColor')||'#3498db').replace('#','0x'), 16);
+            const g = this.make.graphics();
+            g.fillStyle(pColor).fillRect(0,0,40,40).fillStyle(0x000).fillRect(35,12,25,16).generateTexture('p_tex', 65,40);
+            g.clear().fillStyle(0x111).fillRect(0,0,40,40).fillStyle(0xff0000).fillRect(35,12,25,16).generateTexture('b_tex', 65,40);
+            g.clear().fillStyle(0xffff00).fillCircle(5,5,5).generateTexture('bullet', 10,10);
+            g.clear().fillStyle(0x5d4037).fillRect(0,0,80,80).lineStyle(4, 0x3e2723).strokeRect(5,5,70,70).generateTexture('box', 80,80);
+
+            let startX = parseFloat(params.get('x')) || 2000;
+            let startY = parseFloat(params.get('y')) || 2000;
+
+            obstacles = this.physics.add.staticGroup();
+            let caixas = 0;
+            while(caixas < 85) {
+                let ox = Phaser.Math.Between(200, 3800), oy = Phaser.Math.Between(200, 3800);
+                if(Phaser.Math.Distance.Between(ox, oy, startX, startY) > 400) {
+                    let overlapping = false;
+                    obstacles.children.iterate(c => { if(Phaser.Math.Distance.Between(ox, oy, c.x, c.y) < 130) overlapping = true; });
+                    if(!overlapping) { obstacles.create(ox, oy, 'box'); caixas++; }
+                }
+            }
+
+            player = this.physics.add.sprite(startX, startY, 'p_tex').setOrigin(0.5).setCollideWorldBounds(true);
+            bots = this.physics.add.group();
+            bullets = this.physics.add.group();
+
+            for(let i=0; i<30; i++) {
+                let bx, by, dist;
+                do { bx = Phaser.Math.Between(300, 3700); by = Phaser.Math.Between(300, 3700); dist = Phaser.Math.Distance.Between(bx, by, startX, startY); } while (dist < 1000);
+                bots.create(bx, by, 'b_tex').setOrigin(0.5).setCollideWorldBounds(true).setBounce(1);
+            }
+
+            this.physics.add.collider(player, obstacles);
+            this.physics.add.collider(bots, obstacles);
+            this.physics.add.collider(bots, bots);
+            this.physics.add.collider(bullets, obstacles, (bullet) => { bullet.destroy(); });
+
+            this.physics.add.overlap(bullets, bots, (bul, bot) => { if(bul.owner !== bot) { bul.destroy(); bot.destroy(); }});
+            this.physics.add.overlap(bullets, player, (p, bul) => { if(bul.owner !== p) location.reload(); });
+
+            this.cameras.main.startFollow(player, true, 0.1, 0.1);
+            zoneGfx = this.add.graphics();
+
+            let cdDiv = document.getElementById('countdown');
+            let timer = setInterval(() => {
+                contagem--;
+                if(contagem > 0) cdDiv.innerText = contagem;
+                else { cdDiv.innerText = "VAI!"; partidaIniciada = true; clearInterval(timer); setTimeout(() => cdDiv.innerText = "", 1000); }
+            }, 1000);
+        }
+
+        function shoot(scene, shooter) {
+            if(scene.time.now < (shooter.lastFired || 0) + 500) return;
+            shooter.lastFired = scene.time.now;
+            let b = bullets.create(shooter.x, shooter.y, 'bullet');
+            b.owner = shooter;
+            scene.physics.velocityFromRotation(shooter.rotation, 1400, b.body.velocity);
+        }
+
+        function up() {
+            if (!partidaIniciada) { player.setVelocity(0); return; }
+            
+            // Atualiza o contador de vivos (Bots vivos + Player)
+            vivoText.setText('VIVOS: ' + (bots.countActive(true) + 1));
+
+            const speed = 450;
+            if (joystick.force > 0) this.physics.velocityFromRotation(joystick.rotation, joystick.force * speed / 100, player.body.velocity);
+            else {
+                let vx = 0, vy = 0;
+                if (keys.left.isDown) vx = -speed; else if (keys.right.isDown) vx = speed;
+                if (keys.up.isDown) vy = -speed; else if (keys.down.isDown) vy = speed;
+                player.setVelocity(vx, vy);
+            }
+
+            let pTarget = null, pMinDist = 800;
+            bots.children.iterate(b => { if (b.active) { let d = Phaser.Math.Distance.Between(player.x, player.y, b.x, b.y); if (d < pMinDist) { pMinDist = d; pTarget = b; } } });
+            if (pTarget) player.rotation = Phaser.Math.Angle.Between(player.x, player.y, pTarget.x, pTarget.y);
+            else if (joystick.force > 0) player.rotation = joystick.rotation;
+
+            if (isFiring || keys.space.isDown) shoot(this, player);
+
+            zoneRadius -= 0.8;
+            zoneGfx.clear().lineStyle(10, 0xff0000).strokeCircle(2000, 2000, zoneRadius);
+            if(Phaser.Math.Distance.Between(player.x, player.y, 2000, 2000) > zoneRadius) location.reload();
+
+            bots.children.iterate(b => {
+                if(b && b.active) {
+                    let closestTarget = player;
+                    let minDist = Phaser.Math.Distance.Between(b.x, b.y, player.x, player.y);
+                    bots.children.iterate(otherBot => {
+                        if(otherBot !== b && otherBot.active) {
+                            let d = Phaser.Math.Distance.Between(b.x, b.y, otherBot.x, otherBot.y);
+                            if(d < minDist) { minDist = d; closestTarget = otherBot; }
+                        }
+                    });
+                    b.rotation = Phaser.Math.Angle.Between(b.x, b.y, closestTarget.x, closestTarget.y);
+                    this.physics.velocityFromRotation(b.rotation, 200, b.body.velocity);
+                    if(minDist < 600) shoot(this, b);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
