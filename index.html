@@ -9,9 +9,9 @@
         .robot-preview { position: relative; width: 100px; height: 60px; background: #3498db; border-radius: 4px; box-shadow: 0 0 50px rgba(52, 152, 219, 0.4); margin-bottom: 80px; transform: scale(2.5); transition: 0.2s; }
         .robot-preview::after { content: ''; position: absolute; right: -30px; top: 18px; width: 40px; height: 24px; background: #000; border-radius: 2px; }
         .ui-overlay { position: absolute; width: 90%; height: 85%; display: flex; flex-direction: column; justify-content: space-between; }
-        .box-config { background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; border-left: 5px solid #f1c40f; width: 220px; margin-bottom: 15px; }
-        .mode-btn { width: 100%; padding: 12px; margin-top: 8px; background: #2c3e50; border: 2px solid #444; color: white; cursor: pointer; font-family: 'Arial Black'; }
-        .mode-btn.active { border-color: #f1c40f; color: #f1c40f; }
+        .box-config { background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; border-left: 5px solid #f1c40f; width: 220px; }
+        .mode-btn { width: 100%; padding: 12px; margin-top: 8px; background: #2c3e50; border: 2px solid #444; color: white; cursor: pointer; font-family: 'Arial Black'; transition: 0.2s; }
+        .mode-btn.active { border-color: #f1c40f; color: #f1c40f; background: #1a252f; }
         .btn-start { align-self: flex-end; background: #f1c40f; color: #000; padding: 25px 80px; font-size: 35px; border: none; border-radius: 5px; cursor: pointer; box-shadow: 0 8px 0 #9a7d0a; text-transform: uppercase; }
         h1 { position: absolute; top: 20px; font-size: 45px; letter-spacing: 5px; color: #fff; }
     </style>
@@ -24,30 +24,30 @@
             <div class="left-menu">
                 <div class="box-config">
                     <p style="margin:0; font-size: 12px; color: #aaa;">DIFICULDADE</p>
-                    <button id="btnEasy" class="mode-btn active" onclick="setMode('transition.html?mode=normal', 'btnEasy')">MODO NORMAL</button>
-                    <button id="btnHard" class="mode-btn" onclick="setMode('transition.html?mode=hard', 'btnHard')">MODO HARD</button>
+                    <button id="btnEasy" class="mode-btn active" onclick="setMode('normal', 'btnEasy')">MODO NORMAL</button>
+                    <button id="btnHard" class="mode-btn" onclick="setMode('hard', 'btnHard')">MODO HARD</button>
                 </div>
-                <div class="box-config">
+                <div class="box-config" style="margin-top:20px;">
                     <p style="margin:0; font-size: 12px; color: #aaa;">COR DO ROBÔ</p>
-                    <input type="color" id="colorPicker" value="#3498db" onchange="updateSkin()" style="width:100%; height:45px; margin-top:10px;">
+                    <input type="color" id="colorPicker" value="#3498db" onchange="updateSkin()" style="width:100%; height:45px; cursor:pointer; margin-top:10px; border:none; background:transparent;">
                 </div>
             </div>
             <button class="btn-start" onclick="go()">DECOLAR</button>
         </div>
     </div>
     <script>
-        let currentPath = 'transition.html?mode=normal';
+        let selectedMode = 'normal';
         function updateSkin() {
             const c = document.getElementById('colorPicker').value;
             document.getElementById('robotModel').style.backgroundColor = c;
             localStorage.setItem('playerColor', c);
         }
-        function setMode(path, btnId) {
-            currentPath = path;
+        function setMode(mode, btnId) {
+            selectedMode = mode;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(btnId).classList.add('active');
         }
-        function go() { window.location.href = currentPath; }
+        function go() { window.location.href = `mapa_battle_royale.html?mode=${selectedMode}`; }
         window.onload = () => {
             const saved = localStorage.getItem('playerColor') || '#3498db';
             document.getElementById('colorPicker').value = saved;
