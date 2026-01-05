@@ -2,83 +2,152 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Partida Oficial</title>
+    <title>Battle Robot - Combat</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-        body { margin: 0; background: #348C31; overflow: hidden; touch-action: none; }
-        #joy-bg { position: fixed; bottom: 50px; left: 50px; width: 100px; height: 100px; background: rgba(255,255,255,0.2); border-radius: 50%; display: none; z-index: 20; }
+        body { margin: 0; background: #348C31; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        #ui { position: fixed; top: 10px; right: 20px; color: white; font-weight: bold; z-index: 100; text-align: right; }
+        #joy-bg { position: fixed; bottom: 50px; left: 50px; width: 100px; height: 100px; background: rgba(255,255,255,0.2); border-radius: 50%; display: none; z-index: 60; border: 2px solid white; }
         #joy-stick { position: absolute; top: 30px; left: 30px; width: 40px; height: 40px; background: #fff; border-radius: 50%; }
+        #btn-shoot { position: fixed; bottom: 60px; right: 60px; width: 100px; height: 100px; background: rgba(231, 76, 60, 0.8); border: 4px solid white; border-radius: 50%; display: none; z-index: 60; color: white; font-weight: bold; text-align: center; line-height: 90px; }
+        #vitoria { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 200; }
+        #vitoria h2 { color: #f1c40f; font-size: 60px; }
     </style>
 </head>
 <body>
+    <div id="ui">VIVOS: <span id="count">20</span><br>MIRA: <span id="tg">LIVRE</span></div>
     <div id="joy-bg"><div id="joy-stick"></div></div>
+    <div id="btn-shoot">FIRE</div>
+    <div id="vitoria">
+        <h2>VITÓRIA!</h2>
+        <button style="padding:15px 30px; font-weight:bold; cursor:pointer;" onclick="window.location.href='index.html'">VOLTAR AO LOBBY</button>
+    </div>
+
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const spawnX = parseFloat(urlParams.get('x')) || 2000;
         const spawnY = parseFloat(urlParams.get('y')) || 2000;
 
-        const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade' }, scene: { preload: preload, create: create, update: update } };
-        let player, objetos, teclas, joyActive = false, moveVec = {x:0, y:0};
+        const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade' }, scene: { preload: pre, create: cre, update: upd } };
+        let player, bots, tiros, objetos, joyActive = false, moveVec = {x:0, y:0}, gameFim = false, zonaRaio = 2500, zonaG;
         const game = new Phaser.Game(config);
 
-        function preload() {
-            this.load.image('soldado', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
-            this.load.image('casa', 'https://labs.phaser.io/assets/sprites/house.png'); 
-            this.load.image('arvore', 'https://labs.phaser.io/assets/sprites/tree-oak.png');
+        function pre() {
+            this.load.image('c', 'https://labs.phaser.io/assets/sprites/house.png'); 
+            this.load.image('a', 'https://labs.phaser.io/assets/sprites/tree-oak.png');
         }
 
-        function create() {
-            this.cameras.main.fadeIn(500, 0, 0, 0);
-            this.cameras.main.setBackgroundColor('#348C31');
+        function cre() {
             this.physics.world.setBounds(0, 0, 4000, 4000);
+            zonaG = this.add.graphics();
+            
+            // PEGAR COR DO LOCALSTORAGE
+            const corSalva = localStorage.getItem('playerColor') || '#000000';
+            const corNum = parseInt(corSalva.replace('#', '0x'), 16);
+
+            const g = this.make.graphics();
+            // Player com cor escolhida
+            g.fillStyle(corNum); g.fillRect(0,0,40,40); g.fillStyle(0x333333); g.fillRect(35,12,22,16);
+            g.generateTexture('pTex', 60,40); g.clear();
+            // Bot Vermelho
+            g.fillStyle(0xff0000); g.fillRect(0,0,40,40); g.fillStyle(0x880000); g.fillRect(35,12,22,16);
+            g.generateTexture('bTex', 60,40); g.clear();
+            // Bala
+            g.fillStyle(0xffff00); g.fillCircle(5,5,5); g.generateTexture('bt', 10,10);
 
             objetos = this.physics.add.staticGroup();
-            
-            // MESMA SEED 12345 - O MAPA É IDÊNTICO AO ANTERIOR
-            let semente = 12345;
-            for(let i=0; i<80; i++) {
-                semente = (semente * 9301 + 49297) % 233280;
-                let x = 100 + (semente / 233280) * 3800;
-                semente = (semente * 9301 + 49297) % 233280;
-                let y = 100 + (semente / 233280) * 3800;
-                if(i < 30) objetos.create(x, y, 'casa').setScale(1.2).refreshBody();
-                else objetos.create(x, y, 'arvore').setScale(1.5).refreshBody();
-            }
+            for(let i=0; i<60; i++) objetos.create(Phaser.Math.Between(100,3900), Phaser.Math.Between(100,3900), 'c').setScale(1.2).refreshBody();
 
-            player = this.physics.add.sprite(spawnX, spawnY, 'soldado').setCollideWorldBounds(true);
-            this.physics.add.collider(player, objetos);
+            tiros = this.physics.add.group();
+            player = this.physics.add.sprite(spawnX, spawnY, 'pTex').setOrigin(0.5).setDrag(1500).setCollideWorldBounds(true);
+            bots = this.physics.add.group();
+            for(let i=0; i<19; i++) bots.create(Phaser.Math.Between(200,3800), Phaser.Math.Between(200,3800), 'bTex').setOrigin(0.5).setDrag(1000).setCollideWorldBounds(true);
+
+            this.physics.add.collider([player, bots], objetos);
+            this.physics.add.overlap(tiros, bots, (t, b) => { if(t.owner !== b) { t.destroy(); b.destroy(); document.getElementById('count').innerText = bots.countActive()+1; checkV(); } });
+            this.physics.add.overlap(tiros, player, (p, t) => { if(t.owner !== p && !gameFim) location.reload(); });
+            this.physics.add.collider(tiros, objetos, t => t.destroy());
+
             this.cameras.main.startFollow(player, true, 0.1, 0.1);
-            teclas = this.input.keyboard.addKeys('W,A,S,D');
-
             if (this.sys.game.device.input.touch) {
-                document.getElementById('joy-bg').style.display = 'block';
+                document.getElementById('joy-bg').style.display='block';
+                document.getElementById('btn-shoot').style.display='block';
                 setupJoy();
+                document.getElementById('btn-shoot').onpointerdown = () => atirar(this, player);
             }
+            this.input.on('pointerdown', () => { if(!this.sys.game.device.input.touch) atirar(this, player); });
+        }
+
+        function checkV() {
+            if (bots.countActive() === 0) { gameFim = true; document.getElementById('vitoria').style.display = 'flex'; }
+        }
+
+        function atirar(s, a) {
+            if (gameFim) return;
+            let t = s.time.now;
+            if (t < (a.ls || 0) + (a === player ? 300 : 1500)) return;
+            a.ls = t;
+            let b = tiros.create(a.x, a.y, 'bt');
+            b.owner = a;
+            s.physics.velocityFromRotation(a.rotation, 1000, b.body.velocity);
+        }
+
+        function upd() {
+            if (gameFim) { player.setVelocity(0); return; }
+            let vx = 0, vy = 0, cursors = this.input.keyboard.createCursorKeys();
+            let keys = this.input.keyboard.addKeys('W,A,S,D');
+            if(keys.A.isDown) vx = -400; else if(keys.D.isDown) vx = 400;
+            if(keys.W.isDown) vy = -400; else if(keys.S.isDown) vy = 400;
+            if(joyActive) { vx = moveVec.x * 400; vy = moveVec.y * 400; }
+            player.setVelocity(vx, vy);
+
+            // ZONA
+            zonaRaio -= 0.2;
+            zonaG.clear().lineStyle(6, 0x00ffff, 1).strokeCircle(2000, 2000, zonaRaio);
+            if (Phaser.Math.Distance.Between(player.x, player.y, 2000, 2000) > zonaRaio) {
+                this.cameras.main.shake(100, 0.005);
+                player.setData('d', (player.getData('d') || 0) + 1);
+                if(player.getData('d') > 150) location.reload();
+            }
+
+            // MIRA E BOTS
+            let alvo = null, minDist = 600;
+            bots.children.iterate(b => { 
+                if(b && b.active) {
+                    if (Phaser.Math.Distance.Between(b.x, b.y, 2000, 2000) > zonaRaio) { b.destroy(); document.getElementById('count').innerText = bots.countActive()+1; checkV(); }
+                    let d = Phaser.Math.Distance.Between(player.x, player.y, b.x, b.y);
+                    if(d < minDist) { minDist = d; alvo = b; }
+                }
+            });
+            if (alvo) {
+                player.rotation = Phaser.Math.Angle.Between(player.x, player.y, alvo.x, alvo.y);
+                document.getElementById('tg').innerText = "TRAVADA";
+            } else {
+                if (vx !== 0 || vy !== 0) player.rotation = Math.atan2(vy, vx);
+                document.getElementById('tg').innerText = "LIVRE";
+            }
+
+            bots.children.iterate(b => {
+                if(b && b.active && Phaser.Math.Distance.Between(b.x, b.y, player.x, player.y) < 500) {
+                    b.rotation = Phaser.Math.Angle.RotateTo(b.rotation, Phaser.Math.Angle.Between(b.x, b.y, player.x, player.y), 0.1);
+                    this.physics.velocityFromRotation(b.rotation, 150, b.body.velocity);
+                    atirar(this, b);
+                }
+            });
         }
 
         function setupJoy() {
-            const bg = document.getElementById('joy-bg');
-            const stick = document.getElementById('joy-stick');
-            window.addEventListener('touchstart', e => { if(e.target.id.includes('joy')) joyActive = true; });
-            window.addEventListener('touchmove', e => {
+            const bg = document.getElementById('joy-bg'), stick = document.getElementById('joy-stick');
+            window.onpointerdown = e => { if(e.target.id.includes('joy')) joyActive = true; };
+            window.onpointermove = e => {
                 if(!joyActive) return;
-                const rect = bg.getBoundingClientRect();
-                const center = {x: rect.left+50, y: rect.top+50};
-                let dx = e.touches[0].clientX - center.x, dy = e.touches[0].clientY - center.y;
-                const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 40), angle = Math.atan2(dy, dx);
-                moveVec = { x: Math.cos(angle)*(dist/40), y: Math.sin(angle)*(dist/40) };
-                stick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
-            });
-            window.addEventListener('touchend', () => { joyActive = false; stick.style.transform = 'translate(0px, 0px)'; moveVec = {x:0, y:0}; });
-        }
-
-        function update() {
-            player.setVelocity(0);
-            const spd = 400;
-            if(teclas.A.isDown) player.setVelocityX(-spd); else if(teclas.D.isDown) player.setVelocityX(spd);
-            if(teclas.W.isDown) player.setVelocityY(-spd); else if(teclas.S.isDown) player.setVelocityY(spd);
-            if(joyActive) player.setVelocity(moveVec.x * spd, moveVec.y * spd);
-            if(player.body.velocity.x !== 0 || player.body.velocity.y !== 0) player.rotation = Math.atan2(player.body.velocity.y, player.body.velocity.x);
+                const rect = bg.getBoundingClientRect(), center = {x: rect.left+50, y: rect.top+50};
+                let dx = e.clientX-center.x, dy = e.clientY-center.y;
+                const dist = Math.min(Math.sqrt(dx*dx+dy*dy), 40), ang = Math.atan2(dy, dx);
+                moveVec = { x: Math.cos(ang)*(dist/40), y: Math.sin(ang)*(dist/40) };
+                stick.style.transform = `translate(${Math.cos(ang)*dist}px, ${Math.sin(ang)*dist}px)`;
+            };
+            window.onpointerup = () => { joyActive = false; stick.style.transform = 'translate(0px,0px)'; moveVec = {x:0,y:0}; };
         }
     </script>
 </body>
