@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Partida Oficial</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+        body { margin: 0; background: #348C31; overflow: hidden; touch-action: none; }
+        #joy-bg { position: fixed; bottom: 50px; left: 50px; width: 100px; height: 100px; background: rgba(255,255,255,0.2); border-radius: 50%; display: none; z-index: 20; }
+        #joy-stick { position: absolute; top: 30px; left: 30px; width: 40px; height: 40px; background: #fff; border-radius: 50%; }
+    </style>
+</head>
+<body>
+    <div id="joy-bg"><div id="joy-stick"></div></div>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const spawnX = parseFloat(urlParams.get('x')) || 2000;
+        const spawnY = parseFloat(urlParams.get('y')) || 2000;
+
+        const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade' }, scene: { preload: preload, create: create, update: update } };
+        let player, objetos, teclas, joyActive = false, moveVec = {x:0, y:0};
+        const game = new Phaser.Game(config);
+
+        function preload() {
+            this.load.image('soldado', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
+            this.load.image('casa', 'https://labs.phaser.io/assets/sprites/house.png'); 
+            this.load.image('arvore', 'https://labs.phaser.io/assets/sprites/tree-oak.png');
+        }
+
+        function create() {
+            this.cameras.main.fadeIn(500, 0, 0, 0);
+            this.cameras.main.setBackgroundColor('#348C31');
+            this.physics.world.setBounds(0, 0, 4000, 4000);
+
+            objetos = this.physics.add.staticGroup();
+            
+            // MESMA SEED 12345 - O MAPA É IDÊNTICO AO ANTERIOR
+            let semente = 12345;
+            for(let i=0; i<80; i++) {
+                semente = (semente * 9301 + 49297) % 233280;
+                let x = 100 + (semente / 233280) * 3800;
+                semente = (semente * 9301 + 49297) % 233280;
+                let y = 100 + (semente / 233280) * 3800;
+                if(i < 30) objetos.create(x, y, 'casa').setScale(1.2).refreshBody();
+                else objetos.create(x, y, 'arvore').setScale(1.5).refreshBody();
+            }
+
+            player = this.physics.add.sprite(spawnX, spawnY, 'soldado').setCollideWorldBounds(true);
+            this.physics.add.collider(player, objetos);
+            this.cameras.main.startFollow(player, true, 0.1, 0.1);
+            teclas = this.input.keyboard.addKeys('W,A,S,D');
+
+            if (this.sys.game.device.input.touch) {
+                document.getElementById('joy-bg').style.display = 'block';
+                setupJoy();
+            }
+        }
+
+        function setupJoy() {
+            const bg = document.getElementById('joy-bg');
+            const stick = document.getElementById('joy-stick');
+            window.addEventListener('touchstart', e => { if(e.target.id.includes('joy')) joyActive = true; });
+            window.addEventListener('touchmove', e => {
+                if(!joyActive) return;
+                const rect = bg.getBoundingClientRect();
+                const center = {x: rect.left+50, y: rect.top+50};
+                let dx = e.touches[0].clientX - center.x, dy = e.touches[0].clientY - center.y;
+                const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 40), angle = Math.atan2(dy, dx);
+                moveVec = { x: Math.cos(angle)*(dist/40), y: Math.sin(angle)*(dist/40) };
+                stick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
+            });
+            window.addEventListener('touchend', () => { joyActive = false; stick.style.transform = 'translate(0px, 0px)'; moveVec = {x:0, y:0}; });
+        }
+
+        function update() {
+            player.setVelocity(0);
+            const spd = 400;
+            if(teclas.A.isDown) player.setVelocityX(-spd); else if(teclas.D.isDown) player.setVelocityX(spd);
+            if(teclas.W.isDown) player.setVelocityY(-spd); else if(teclas.S.isDown) player.setVelocityY(spd);
+            if(joyActive) player.setVelocity(moveVec.x * spd, moveVec.y * spd);
+            if(player.body.velocity.x !== 0 || player.body.velocity.y !== 0) player.rotation = Math.atan2(player.body.velocity.y, player.body.velocity.x);
+        }
+    </script>
+</body>
+</html>
