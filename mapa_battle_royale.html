@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Sobrevôo</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+        body { margin: 0; background: #348C31; overflow: hidden; }
+        .btn-pular { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); padding: 20px 40px; background: #ff4444; color: white; border-radius: 50px; font-weight: bold; font-size: 20px; z-index: 100; cursor: pointer; border: 4px solid #fff; }
+    </style>
+</head>
+<body>
+    <button class="btn-pular" id="btnPular">SALTAR AGORA!</button>
+    <script>
+        const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade' }, scene: { preload: preload, create: create, update: update } };
+        let aviao, player, estado = 'AVIAO';
+        const game = new Phaser.Game(config);
+
+        function preload() {
+            this.load.image('aviao', 'https://labs.phaser.io/assets/sprites/ship.png'); 
+            this.load.image('soldado', 'https://labs.phaser.io/assets/sprites/phaser-dude.png');
+            this.load.image('casa', 'https://labs.phaser.io/assets/sprites/house.png'); 
+            this.load.image('arvore', 'https://labs.phaser.io/assets/sprites/tree-oak.png');
+        }
+
+        function create() {
+            this.cameras.main.setBackgroundColor('#348C31');
+            
+            // GERADOR DE MAPA IDÊNTICO (SEED 12345)
+            let semente = 12345;
+            for(let i=0; i<80; i++) {
+                semente = (semente * 9301 + 49297) % 233280;
+                let x = 100 + (semente / 233280) * 3800;
+                semente = (semente * 9301 + 49297) % 233280;
+                let y = 100 + (semente / 233280) * 3800;
+                if(i < 30) this.add.image(x, y, 'casa').setScale(1.2);
+                else this.add.image(x, y, 'arvore').setScale(1.5);
+            }
+
+            aviao = this.add.sprite(100, 2000, 'aviao').setAngle(90).setScale(2.5);
+            player = this.add.sprite(100, 2000, 'soldado').setVisible(false);
+            this.cameras.main.startFollow(aviao, true, 0.1, 0.1);
+            this.cameras.main.setZoom(0.5);
+
+            document.getElementById('btnPular').onclick = () => {
+                estado = 'QUEDA';
+                document.getElementById('btnPular').style.display = 'none';
+                player.setPosition(aviao.x, aviao.y).setVisible(true);
+                this.cameras.main.startFollow(player, true, 0.1, 0.1);
+                this.tweens.add({ targets: this.cameras.main, zoom: 1.5, duration: 1500, onComplete: () => {
+                    this.cameras.main.fadeOut(500, 0, 0, 0);
+                    this.cameras.main.once('camerafadeoutcomplete', () => {
+                        window.location.href = `game_oficial.html?x=${player.x}&y=${player.y}`;
+                    });
+                }});
+            };
+        }
+        function update() { aviao.x += 8; if(estado === 'QUEDA') player.y += 3; }
+    </script>
+</body>
+</html>
