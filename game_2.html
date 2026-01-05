@@ -2,33 +2,35 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Battle Robot - Ultimate Edition</title>
+    <title>Battle Robot - Pro Edition</title>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
         body { margin: 0; background: #348C31; overflow: hidden; touch-action: none; font-family: 'Arial', sans-serif; }
         
-        /* Interface de Usuário (UI) */
+        /* Botão Sair (Restaurado) */
+        #btn-quit { 
+            position: fixed; top: 20px; left: 20px; 
+            padding: 10px 25px; background: #e74c3c; color: white; 
+            font-weight: bold; border: 2px solid #c0392b; border-radius: 8px; 
+            cursor: pointer; z-index: 200; 
+        }
+
+        /* Interface de Usuário (Vivos e Mira) */
         #ui { 
             position: fixed; top: 20px; right: 20px; 
             color: white; text-align: right; z-index: 100; 
             text-shadow: 2px 2px 4px #000; pointer-events: none;
         }
         .stat { font-size: 24px; font-weight: bold; }
-        
-        #btn-quit { 
-            position: fixed; top: 20px; left: 20px; 
-            padding: 10px 20px; background: #e74c3c; color: white; 
-            border: 2px solid #c0392b; border-radius: 8px; cursor: pointer; z-index: 101; 
-        }
 
-        /* Contagem Regressiva */
+        /* Contagem Regressiva Inicial */
         #countdown {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
             color: #fff; font-size: 120px; font-weight: 900;
             text-shadow: 5px 5px 0 #000; z-index: 1000; pointer-events: none;
         }
 
-        /* Joystick Visual Estilo Pro */
+        /* Joystick Visual */
         #joy-bg { 
             position: fixed; bottom: 50px; left: 50px; 
             width: 120px; height: 120px; background: rgba(255,255,255,0.1); 
@@ -50,23 +52,19 @@
             user-select: none; pointer-events: none;
         }
 
-        /* Telas de Fim de Jogo */
+        /* Tela de Fim de Jogo (Sem botões, apenas aviso) */
         #overlay { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(0,0,0,0.8); display: none; 
             flex-direction: column; align-items: center; justify-content: center; 
             z-index: 2000; color: white;
         }
-        .btn-fim { 
-            padding: 15px 40px; font-size: 20px; background: #2ecc71; 
-            color: white; border: none; border-radius: 10px; cursor: pointer; margin-top: 20px;
-        }
     </style>
 </head>
 <body>
 
     <button id="btn-quit" onclick="window.location.href='index.html'">SAIR</button>
-    
+
     <div id="ui">
         <div class="stat">VIVOS: <span id="count">31</span></div>
         <div style="font-size: 14px;">MIRA: <span id="tg">LIVRE</span></div>
@@ -78,8 +76,8 @@
     <div id="btn-shoot">FOGO</div>
 
     <div id="overlay">
-        <h2 id="msg-fim" style="font-size: 48px;">VITÓRIA!</h2>
-        <button class="btn-fim" onclick="window.location.href='index.html'">VOLTAR AO LOBBY</button>
+        <h2 id="msg-fim" style="font-size: 48px;">FIM DE JOGO</h2>
+        <p style="font-size: 18px;">Reiniciando partida automaticamente...</p>
     </div>
 
     <script>
@@ -100,7 +98,6 @@
         new Phaser.Game(config);
 
         function pre() {
-            // Carrega imagens reais para os obstáculos (igual ao Pro Mobile)
             this.load.image('casa', 'https://labs.phaser.io/assets/sprites/house.png'); 
             this.load.image('arvore', 'https://labs.phaser.io/assets/sprites/tree-oak.png');
         }
@@ -110,23 +107,19 @@
             this.physics.world.setBounds(0, 0, 4000, 4000);
             zonaG = this.add.graphics();
 
-            // Gerar texturas dos robôs (baseado no Hard Mode)
             const pColor = parseInt((localStorage.getItem('playerColor')||'#3498db').replace('#','0x'), 16);
             const g = this.make.graphics();
             g.fillStyle(pColor).fillRect(0,0,40,40).fillStyle(0x000).fillRect(35,12,25,16).generateTexture('pTex', 65,40);
             g.clear().fillStyle(0x111).fillRect(0,0,40,40).fillStyle(0xff0000).fillRect(35,12,25,16).generateTexture('bTex', 65,40);
             g.clear().fillStyle(0xffff00).fillCircle(5,5,5).generateTexture('bt', 10,10);
 
-            // Obstáculos
             objetos = this.physics.add.staticGroup();
-            for(let i=0; i<70; i++) {
-                let x = Phaser.Math.Between(100, 3900);
-                let y = Phaser.Math.Between(100, 3900);
-                let tipo = Math.random() > 0.5 ? 'casa' : 'arvore';
-                objetos.create(x, y, tipo).setScale(1.2).refreshBody();
+            for(let i=0; i<75; i++) {
+                let x = Phaser.Math.Between(150, 3850);
+                let y = Phaser.Math.Between(150, 3850);
+                objetos.create(x, y, Math.random() > 0.5 ? 'casa' : 'arvore').setScale(1.2).refreshBody();
             }
 
-            // Player e Bots
             let startX = parseFloat(params.get('x')) || 2000;
             let startY = parseFloat(params.get('y')) || 2000;
             
@@ -137,47 +130,33 @@
             for(let i=0; i<30; i++) {
                 let bx, by;
                 do { bx = Phaser.Math.Between(200, 3800); by = Phaser.Math.Between(200, 3800); } 
-                while (Phaser.Math.Distance.Between(bx, by, startX, startY) < 800);
+                while (Phaser.Math.Distance.Between(bx, by, startX, startY) < 900);
                 bots.create(bx, by, 'bTex').setOrigin(0.5).setCollideWorldBounds(true).setBounce(1);
             }
 
-            // Colisões
             this.physics.add.collider([player, bots], objetos);
             this.physics.add.collider(bots, bots);
             this.physics.add.overlap(tiros, bots, (t, b) => { if(t.owner !== b) { t.destroy(); b.destroy(); atualizarContagem(); } });
-            this.physics.add.overlap(tiros, player, (p, t) => { if(t.owner !== p && !gameFim) finalizarJogo("DERROTA"); });
+            this.physics.add.overlap(tiros, player, (p, t) => { if(t.owner !== p && !gameFim) finalizarJogo("DERROTA!"); });
             this.physics.add.collider(tiros, objetos, t => t.destroy());
 
             this.cameras.main.startFollow(player, true, 0.1, 0.1);
 
-            // Contagem Regressiva
             let cdDiv = document.getElementById('countdown');
             let timer = setInterval(() => {
                 contagem--;
                 if(contagem > 0) cdDiv.innerText = contagem;
-                else { 
-                    cdDiv.innerText = "VAI!"; 
-                    gameAtivo = true; 
-                    clearInterval(timer); 
-                    setTimeout(() => cdDiv.innerText = "", 1000); 
-                }
+                else { cdDiv.innerText = "VAI!"; gameAtivo = true; clearInterval(timer); setTimeout(() => cdDiv.innerText = "", 1000); }
             }, 1000);
 
-            // Controle de Toque (Joystick e Tiro)
             this.input.on('pointerdown', (pointer) => {
-                if (pointer.x < window.innerWidth / 2) {
-                    joyActive = true;
-                    joyPointer = pointer;
-                } else {
-                    atirar(this, player);
-                }
+                if (pointer.x < window.innerWidth / 2) { joyActive = true; joyPointer = pointer; } 
+                else { atirar(this, player); }
             });
 
             this.input.on('pointerup', (pointer) => {
                 if (pointer === joyPointer) {
-                    joyActive = false;
-                    joyPointer = null;
-                    moveVec = {x:0, y:0};
+                    joyActive = false; joyPointer = null; moveVec = {x:0, y:0};
                     document.getElementById('joy-stick').style.transform = 'translate(0px,0px)';
                 }
             });
@@ -186,7 +165,7 @@
         function atualizarContagem() {
             let total = bots.countActive() + 1;
             document.getElementById('count').innerText = total;
-            if (total === 1 && !gameFim) finalizarJogo("VITÓRIA");
+            if (total === 1 && !gameFim) finalizarJogo("VITÓRIA!");
         }
 
         function atirar(cena, atirador) {
@@ -194,53 +173,42 @@
             let agora = cena.time.now;
             if (agora < (atirador.lastShot || 0) + 500) return;
             atirador.lastShot = agora;
-
             let b = tiros.create(atirador.x, atirador.y, 'bt');
             b.owner = atirador;
-            cena.physics.velocityFromRotation(atirador.rotation, 1200, b.body.velocity);
+            cena.physics.velocityFromRotation(atirador.rotation, 1300, b.body.velocity);
         }
 
         function finalizarJogo(msg) {
+            if(gameFim) return;
             gameFim = true;
             document.getElementById('msg-fim').innerText = msg;
             document.getElementById('overlay').style.display = 'flex';
+            setTimeout(() => { location.reload(); }, 2000);
         }
 
         function upd() {
             if (!gameAtivo || gameFim) { player.setVelocity(0); return; }
 
-            // Lógica do Joystick
             if (joyActive && joyPointer) {
-                const centerX = 50 + 60;
-                const centerY = window.innerHeight - 50 - 60;
-                let dx = joyPointer.x - centerX;
-                let dy = joyPointer.y - centerY;
-                let dist = Math.sqrt(dx*dx + dy*dy);
-                let angle = Math.atan2(dy, dx);
-                let moveDist = Math.min(dist, 40);
-                
+                const centerX = 110, centerY = window.innerHeight - 110;
+                let dx = joyPointer.x - centerX, dy = joyPointer.y - centerY;
+                let dist = Math.sqrt(dx*dx + dy*dy), angle = Math.atan2(dy, dx), moveDist = Math.min(dist, 40);
                 moveVec = { x: Math.cos(angle) * (moveDist/40), y: Math.sin(angle) * (moveDist/40) };
                 document.getElementById('joy-stick').style.transform = `translate(${Math.cos(angle)*moveDist}px, ${Math.sin(angle)*moveDist}px)`;
             }
 
-            // Movimentação (Joystick + Teclado)
             let vx = 0, vy = 0;
             let cursors = this.input.keyboard.addKeys('W,A,S,D');
             if(cursors.A.isDown) vx = -450; else if(cursors.D.isDown) vx = 450;
             if(cursors.W.isDown) vy = -450; else if(cursors.S.isDown) vy = 450;
-            
             if(joyActive) { vx = moveVec.x * 450; vy = moveVec.y * 450; }
             player.setVelocity(vx, vy);
 
-            // Zona Radioativa
-            zonaRaio -= 0.6;
+            zonaRaio -= 0.65;
             zonaG.clear().lineStyle(10, 0xff0000).strokeCircle(2000, 2000, zonaRaio);
-            if (Phaser.Math.Distance.Between(player.x, player.y, 2000, 2000) > zonaRaio) {
-                finalizarJogo("MORREU NA ZONA");
-            }
+            if (Phaser.Math.Distance.Between(player.x, player.y, 2000, 2000) > zonaRaio) finalizarJogo("MORREU NA ZONA!");
 
-            // Mira Automática (Igual ao Pro Mobile)
-            let alvo = null, minDist = 700;
+            let alvo = null, minDist = 750;
             bots.children.iterate(b => {
                 if(b && b.active) {
                     if (Phaser.Math.Distance.Between(b.x, b.y, 2000, 2000) > zonaRaio) { b.destroy(); atualizarContagem(); }
@@ -257,13 +225,12 @@
                 document.getElementById('tg').innerText = "LIVRE";
             }
 
-            // IA dos Bots
             bots.children.iterate(b => {
                 if(b && b.active) {
                     let d = Phaser.Math.Distance.Between(b.x, b.y, player.x, player.y);
-                    if(d < 600) {
+                    if(d < 650) {
                         b.rotation = Phaser.Math.Angle.Between(b.x, b.y, player.x, player.y);
-                        this.physics.velocityFromRotation(b.rotation, 200, b.body.velocity);
+                        this.physics.velocityFromRotation(b.rotation, 220, b.body.velocity);
                         atirar(this, b);
                     }
                 }
