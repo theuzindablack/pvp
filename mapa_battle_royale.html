@@ -12,21 +12,28 @@
 <body>
     <button class="btn-pular" onclick="pular()">SALTAR!</button>
     <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const mode = urlParams.get('mode') || 'normal';
+
         const config = { type: Phaser.AUTO, width: window.innerWidth, height: window.innerHeight, physics: { default: 'arcade' }, scene: { preload: p, create: c, update: u } };
         let a; const game = new Phaser.Game(config);
+
         function p() { 
             this.load.image('s', 'https://labs.phaser.io/assets/sprites/ship.png'); 
             this.load.image('h', 'https://labs.phaser.io/assets/sprites/house.png'); 
         }
         function c() {
             this.cameras.main.setBackgroundColor('#348C31');
-            for(let i=0; i<40; i++) this.add.image(Phaser.Math.Between(0,4000), Phaser.Math.Between(0,4000), 'h');
+            for(let i=0; i<40; i++) this.add.image(Phaser.Math.Between(0,4000), Phaser.Math.Between(0,4000), 'h').setAlpha(0.5);
             a = this.add.sprite(-100, 2000, 's').setAngle(90).setScale(3);
             this.cameras.main.startFollow(a, true, 0.1, 0.1);
             this.cameras.main.setZoom(0.5);
         }
         function u() { a.x += 10; }
-        function pular() { window.location.href = `game_oficial.html?x=${a.x}&y=${a.y}`; }
+        function pular() { 
+            const destino = (mode === 'hard') ? 'game_2.html' : 'game_oficial.html';
+            window.location.href = `${destino}?x=${a.x}&y=${a.y}`; 
+        }
     </script>
 </body>
 </html>
